@@ -55,6 +55,8 @@ private:
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
   std::string                                                    takeoff_tracker_name_;
 
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_control_reference_;
+
   mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics> sh_controller_diag_;
 
   mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics> sh_estimation_manager_diag_;

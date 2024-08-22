@@ -73,10 +73,11 @@ void VinsKickoff::initialize(ros::NodeHandle &nh, const std::shared_ptr<mrs_uav_
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   sh_control_manager_diag_    = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
-  sh_controller_diag_    = mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics>(shopts, "controller_diagnostics_in");
+  sh_controller_diag_         = mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics>(shopts, "controller_diagnostics_in");
   sh_estimation_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "diagnostics_out");
   sh_hw_api_orient_           = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, topic_orientation_);
   sh_hw_api_ang_vel_          = mrs_lib::SubscribeHandler<geometry_msgs::Vector3Stamped>(shopts, topic_angular_velocity_);
+  sh_control_reference_       = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "control_reference_in");
 
   /*//{ initialize service clients */
 
@@ -220,7 +221,8 @@ void VinsKickoff::timerUpdate([[maybe_unused]] const ros::TimerEvent &event) {
     case RUNNING_STATE: {
 
       // first we wait until we start taking off (detected by switching into landoff tracker and finishing rampup)
-      if (!is_taking_off_ && sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_ && sh_controller_diag_.hasMsg() && !sh_controller_diag_.getMsg()->ramping_up) {
+      if (!is_taking_off_ && sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_ &&
+          sh_controller_diag_.hasMsg() && !sh_controller_diag_.getMsg()->ramping_up) {
         t_init_kickoff_ = ros::Time::now();
         is_taking_off_  = true;
       }
@@ -302,6 +304,7 @@ void VinsKickoff::updateUavState() {
 
   const double hdg = 0;
 
+  // we want to have attitude feedback with zero heading
   auto res = rotateQuaternionByHeading(sh_hw_api_orient_.getMsg()->quaternion, hdg);
   if (res) {
     uav_state.pose.orientation = res.value();
@@ -310,7 +313,16 @@ void VinsKickoff::updateUavState() {
     return;
   }
 
+  // we want to have angular velocity feedback
   uav_state.velocity.angular = sh_hw_api_ang_vel_.getMsg()->vector;
+
+  // we want to set the current position slightly below the reference
+  if (sh_control_reference_.hasMsg()) {
+    uav_state.pose.position   = sh_control_reference_.getMsg()->pose.pose.position;
+    uav_state.velocity.linear = sh_control_reference_.getMsg()->twist.twist.linear;
+    uav_state.pose.position.z -= 0.2;
+    ROS_INFO("[%s]: fabricated z: %.2f", getPrintName().c_str(), uav_state.pose.position.z);
+  }
 
   const nav_msgs::Odometry odom = Support::uavStateToOdom(uav_state);
 
@@ -372,7 +384,7 @@ bool VinsKickoff::callFailsafeService() {
 bool VinsKickoff::callSwitchEstimatorService() {
   mrs_msgs::String srv_out;
   srv_out.request.value = target_estimator_;
-  bool success = srvch_switch_estimator_.call(srv_out);
+  bool success          = srvch_switch_estimator_.call(srv_out);
   success &= srv_out.response.success;
   return success;
 }
