@@ -73,6 +73,7 @@ void VinsKickoff::initialize(ros::NodeHandle &nh, const std::shared_ptr<mrs_uav_
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   sh_control_manager_diag_    = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  sh_controller_diag_    = mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics>(shopts, "controller_diagnostics_in");
   sh_estimation_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "diagnostics_out");
   sh_hw_api_orient_           = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, topic_orientation_);
   sh_hw_api_ang_vel_          = mrs_lib::SubscribeHandler<geometry_msgs::Vector3Stamped>(shopts, topic_angular_velocity_);
@@ -218,13 +219,15 @@ void VinsKickoff::timerUpdate([[maybe_unused]] const ros::TimerEvent &event) {
 
     case RUNNING_STATE: {
 
-      // first we wait until we start taking off (detected by switching into landoff tracker)
-      if (!is_taking_off_ && sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_) {
+      // first we wait until we start taking off (detected by switching into landoff tracker and finishing rampup)
+      if (!is_taking_off_ && sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_ && sh_controller_diag_.hasMsg() && !sh_controller_diag_.getMsg()->ramping_up) {
         t_init_kickoff_ = ros::Time::now();
         is_taking_off_  = true;
       }
 
       if (is_taking_off_) {
+
+        ROS_INFO("[%s]: time kicking off: %.2f/%.2f", getPrintName().c_str(), (ros::Time::now() - t_init_kickoff_).toSec(), dur_max_kicking_.toSec());
 
         // we are waiting until vins estimator is initialized so we can switch into it
         if (isVinsEstimatorInitialized()) {
@@ -237,8 +240,6 @@ void VinsKickoff::timerUpdate([[maybe_unused]] const ros::TimerEvent &event) {
           ROS_INFO("[%s]: vins kickoff took %.2f", getPrintName().c_str(), (ros::Time::now() - t_init_kickoff_).toSec());
           changeState(STOPPED_STATE);
         }
-
-        ROS_INFO("[%s]: time kicking off: %.2f/%.2f", getPrintName().c_str(), (ros::Time::now() - t_init_kickoff_).toSec(), dur_max_kicking_.toSec());
 
         // did not manage to initialize vins estimator in time, call failsafe
         if (ros::Time::now() - t_init_kickoff_ > dur_max_kicking_) {
