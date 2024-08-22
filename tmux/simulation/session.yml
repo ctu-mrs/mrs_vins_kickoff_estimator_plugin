@@ -36,7 +36,7 @@ windows:
           world_config:=./custom_configs/world_config.yaml
           network_config:=./custom_configs/network_config.yaml
           platform_config:=`rospack find mrs_uav_gazebo_simulation`/config/mrs_uav_system/$UAV_TYPE.yaml
-          custom_config:=`rospack find mrs_vins_kickoff_estimator_plugin`/custom_configs/mrs_uav_managers.yaml
+          custom_config:=./custom_configs/mrs_uav_managers.yaml
   - open_vins:
       layout: tiled
       panes:
