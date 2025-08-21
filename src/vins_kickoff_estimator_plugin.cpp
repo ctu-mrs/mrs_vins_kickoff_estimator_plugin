@@ -300,7 +300,7 @@ void VinsKickoff::updateUavState() {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("StateGeneric::updateUavState", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "StateGeneric::updateUavState", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   const rclcpp::Time time_now = node_->now();
 
