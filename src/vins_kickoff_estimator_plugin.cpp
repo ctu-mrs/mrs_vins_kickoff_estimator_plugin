@@ -380,18 +380,19 @@ bool VinsKickoff::setUavState([[maybe_unused]] const mrs_msgs::msg::UavState &ua
 
 /*//{ callFailsafeService() */
 bool VinsKickoff::callFailsafeService() {
-  std_srvs::srv::Trigger srv_out;
-  return srvch_failsafe_.call(srv_out);
+  auto srv_in = std::make_shared<std_srvs::srv::Trigger::Request>();
+  auto srv_out = srvch_failsafe_.callSync(srv_in).value();
+  return srv_out->success;
 }
 /*//}*/
 
 /*//{ callSwitchEstimatorService() */
 bool VinsKickoff::callSwitchEstimatorService() {
-  mrs_msgs::srv::String srv_out;
-  srv_out.request.value = target_estimator_;
-  bool success          = srvch_switch_estimator_.call(srv_out);
-  success &= srv_out.response.success;
-  return success;
+  auto srv_in = std::make_shared<mrs_msgs::srv::String::Request>();
+  srv_in->value = target_estimator_;
+
+  auto srv_out = srvch_switch_estimator_.callSync(srv_in).value();
+  return srv_out->success;
 }
 /*//}*/
 
